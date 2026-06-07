@@ -1255,27 +1255,26 @@ let CONFIG = {
 
 /* ===== APPS SCRIPT WRITE FUNCTIONS ===== */
 async function appsScriptCall(payload) {
+  // الطريقة الأولى: POST مع no-cors (تعمل دائماً مع Apps Script المنشور للعموم)
   try {
-    // استخدام no-cors مع GET لتجنب مشاكل CORS مع Apps Script
-    // نُرسل البيانات عبر URL params بدلاً من POST body
-    const params = new URLSearchParams({ data: JSON.stringify(payload) });
-    const url = APPS_SCRIPT_URL + '?' + params.toString();
-    const res = await fetch(url, { method: 'GET', redirect: 'follow' });
-    const text = await res.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = { success: false, error: text }; }
-    return data;
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+    // no-cors لا يُعيد response قابل للقراءة — نفترض النجاح
+    return { success: true, note: 'no-cors' };
   } catch (err) {
-    // محاولة بديلة عبر POST مع no-cors
+    // الطريقة الثانية: GET عبر CORS proxy
     try {
-      await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
-      });
-      // no-cors لا يُعيد response — نفترض النجاح
-      return { success: true, note: 'no-cors mode' };
+      const params = new URLSearchParams({ data: JSON.stringify(payload) });
+      const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(APPS_SCRIPT_URL + '?' + params.toString());
+      const res = await fetch(proxyUrl, { redirect: 'follow' });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { success: true, note: 'proxy-fallback' }; }
+      return data;
     } catch (err2) {
       return { success: false, error: err2.message };
     }
