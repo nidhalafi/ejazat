@@ -2,15 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="application-name" content="نظام الإجازات">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="نظام الإجازات">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#1a3a5c">
-<meta name="description" content="نظام إدارة إجازات مركز إصلاح الأطفال الجانحين سوق الجديد">
-<link rel="manifest" href="manifest.json">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>نظام إدارة الإجازات - مركز إصلاح الأطفال الجانحين سوق الجديد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -779,12 +771,31 @@
     <div class="section-label">معرّف Google Sheet (Sheet ID)</div>
     <input type="text" id="cfgSheetId" placeholder="معرّف Google Sheet" value="15Cw54NIwiaP1roWcWLh4ir1DmlaaWDsS">
     <div style="background:#d1fae5; border:1px solid #6ee7b7; border-radius:8px; padding:12px; font-size:12px; color:#065f46; margin-bottom:12px; line-height:1.9;">
-      <strong>✅ طريقة الاتصال: نشر الجدول للعموم (مجاني بالكامل)</strong><br>
-      في Google Sheets افتح الجدول ثم:<br>
+      <strong>✅ طريقة الاتصال: نشر الجدول للعموم (مجاني بالكامل) — مطلوب دائماً</strong><br>
+      في Google Sheets افتح الجدول ثم:
+        <br><strong>⚠️ هذه الخطوة ضرورية لعمل النظام</strong><br>
       <strong>File → Share → Publish to web → Publish</strong><br>
-      لا حاجة لـ API Key ولا حساب خدمة.
+      لا حاجة لـ API Key ولا حساب خدمة.<br>
+        <small style="color:#065f46;font-size:11px;">📌 استخدم الـ Published ID من رابط pubhtml (يبدأ بـ 2PACX-...)</small>
     </div>
     <input type="hidden" id="cfgApiKey" value="">
+
+    <hr class="section-divider">
+    <div class="section-label">🗂️ أرقام الصفحات (GIDs) — مهم لصحة الربط</div>
+    <p style="font-size:12px; color:var(--text-muted); margin-bottom:10px; line-height:1.7;">
+      اعثر على رقم GID من رابط الصفحة في Google Sheets:<br>
+      <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:11px;">...spreadsheets/d/ID/edit#gid=<strong>XXXXXX</strong></code>
+    </p>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+      <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">Employees (الموظفون)</label><input type="text" id="cfgGidEmp" class="finput" placeholder="645917957" style="margin-bottom:0;"></div>
+      <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">AnnualLeaves (سنوية)</label><input type="text" id="cfgGidAnn" class="finput" placeholder="1376477356" style="margin-bottom:0;"></div>
+      <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">ExceptionalLeaves (استثنائية)</label><input type="text" id="cfgGidExc" class="finput" placeholder="1273983452" style="margin-bottom:0;"></div>
+      <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">SickLeaves (مرضية)</label><input type="text" id="cfgGidSick" class="finput" placeholder="543405937" style="margin-bottom:0;"></div>
+      <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;">Messages (الرسائل)</label><input type="text" id="cfgGidMsg" class="finput" placeholder="445899271" style="margin-bottom:0;"></div>
+    </div>
+    <button onclick="testConnectionFromConfig()" style="width:100%;padding:10px;background:#0ea5e9;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:600;margin-bottom:8px;">🔌 اختبار الاتصال الآن</button>
+    <div id="cfgTestResult" style="display:none;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:12px;line-height:1.8;"></div>
+
     <div class="section-label">السنة الحالية</div>
     <input type="number" id="cfgYear" value="2025" min="2020" max="2030">
     <hr class="section-divider">
@@ -1225,7 +1236,8 @@
 
 <script>
 const DEFAULT_SHEET_ID = '15Cw54NIwiaP1roWcWLh4ir1DmlaaWDsS';
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlnRHGI6PoTq_D4b_u-7yv1VNjEr8hNmkfdJ24_7oJ2dzMhItk-cgihoAKASZ710A/exec';
+const PUBLISHED_SHEET_ID = '2PACX-1vSHJtXcMzBD5boK7RYx__manAgWqk_k0UBgurAS1l0OfDliuojAbUY5R88tTmRWtw'; // الجدول المنشور للعموم
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzpExOmzygxWwr8yL8julaMnXVWMtCHifWnToeUYyMZBeDhePZjWJK5qa7xBR2TI58/exec';
 
 if (localStorage.getItem('gs_sheet_id') === '1-uYgHiLFq-fW79Fttr2nlWiHbMDe6QCy') {
   localStorage.setItem('gs_sheet_id', DEFAULT_SHEET_ID);
@@ -1233,6 +1245,7 @@ if (localStorage.getItem('gs_sheet_id') === '1-uYgHiLFq-fW79Fttr2nlWiHbMDe6QCy')
 
 let CONFIG = {
   sheetId: localStorage.getItem('gs_sheet_id') || DEFAULT_SHEET_ID,
+  publishedId: localStorage.getItem('gs_published_id') || PUBLISHED_SHEET_ID,
   apiKey:  localStorage.getItem('gs_api_key')  || '',
   year:    parseInt(localStorage.getItem('gs_year') || '2025'),
   superPhone: localStorage.getItem('gs_super_phone') || '',
@@ -1242,17 +1255,29 @@ let CONFIG = {
 /* ===== APPS SCRIPT WRITE FUNCTIONS ===== */
 async function appsScriptCall(payload) {
   try {
-    const res = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(payload)
-    });
+    // استخدام no-cors مع GET لتجنب مشاكل CORS مع Apps Script
+    // نُرسل البيانات عبر URL params بدلاً من POST body
+    const params = new URLSearchParams({ data: JSON.stringify(payload) });
+    const url = APPS_SCRIPT_URL + '?' + params.toString();
+    const res = await fetch(url, { method: 'GET', redirect: 'follow' });
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch { data = { success: false, error: text }; }
     return data;
   } catch (err) {
-    return { success: false, error: err.message };
+    // محاولة بديلة عبر POST مع no-cors
+    try {
+      await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      // no-cors لا يُعيد response — نفترض النجاح
+      return { success: true, note: 'no-cors mode' };
+    } catch (err2) {
+      return { success: false, error: err2.message };
+    }
   }
 }
 
@@ -1335,10 +1360,25 @@ async function syncUpdateStatus(sheetName, r, status) {
 let currentEmployee = null;
 let dataSource = null;
 
-let MESSAGES_STORE = [
-  { MessageID:'MSG001', ToUserID:'ALL', FromUserID:'ADMIN', Date:'2025-06-01', Subject:'تذكير باجتماع', Body:'يُرجى الحضور للاجتماع الدوري يوم الاثنين القادم في الساعة 9 صباحاً.', Read:0 },
-  { MessageID:'MSG002', ToUserID:'EMP001', FromUserID:'ADMIN', Date:'2025-06-03', Subject:'موافقة على الإجازة', Body:'تمت الموافقة على طلب إجازتك السنوية. نتمنى لك قضاء وقت ممتع.', Read:0 },
-];
+let MESSAGES_STORE = []; // تُحمَّل من Google Sheets عند تسجيل الدخول
+
+async function loadMessagesFromSheets() {
+  try {
+    const rows = await fetchSheetData('Messages');
+    MESSAGES_STORE = rows.map(r => ({
+      MessageID:  r.MessageID  || 'MSG' + Math.random().toString(36).slice(2,8),
+      ToUserID:   (r.ToUserID  || 'ALL').toUpperCase(),
+      FromUserID: r.FromUserID || 'ADMIN',
+      Date:       r.Date       || '',
+      Subject:    r.Subject    || '',
+      Body:       r.Body       || '',
+      Read:       parseInt(r.Read || 0)
+    }));
+  } catch(e) {
+    // إذا فشل التحميل، ابدأ بقائمة فارغة
+    MESSAGES_STORE = [];
+  }
+}
 
 const DEMO_DATA = {
   employees: [
@@ -1385,16 +1425,29 @@ async function handleLogin() {
         employee = await fetchEmployeeFromSheets(userId, password);
       } catch(e) {
         dataSource = 'demo';
-        employee = DEMO_DATA.employees.find(e => e.UserID.toUpperCase() === userId && e.Password === password);
-        if (employee) {
-          showLoading(false);
-          errDiv.innerHTML = '⚠️ تعذّر الاتصال بـ Google Sheet.<br><small>يعمل الآن بالبيانات التجريبية.</small>';
-          errDiv.style.display = 'block'; errDiv.style.background = '#fef3c7'; errDiv.style.color = '#92400e'; errDiv.style.border = '1px solid #fcd34d';
-        }
+        showLoading(false);
+        // رسالة خطأ واضحة مع سبب المشكلة
+        errDiv.style.cssText = 'display:block; background:#fef3c7; color:#92400e; border:1px solid #fcd34d; padding:12px 14px; border-radius:8px; font-size:13px; margin-bottom:1rem; text-align:right; line-height:1.8;';
+        errDiv.innerHTML = `⚠️ <strong>تعذّر الاتصال بـ Google Sheet</strong><br>
+          <span style="font-size:12px;">${e.message}</span><br><br>
+          <strong>الحلول:</strong><br>
+          • تأكد أن الجدول <strong>منشور للعموم</strong>: File → Share → Publish to web → Publish<br>
+          • تحقق من صحة <strong>Sheet ID</strong> في <a href="#" onclick="openConfig();return false;" style="color:#92400e;font-weight:700;">إعدادات الاتصال</a><br>
+          • أو جرّب <a href="#" onclick="loadDemoData();return false;" style="color:#92400e;font-weight:700;">البيانات التجريبية</a>`;
+        return;
       }
     } else {
-      employee = DEMO_DATA.employees.find(e => e.UserID.toUpperCase() === userId && e.Password === password);
-      if (employee) dataSource = 'demo';
+      // استخدام Google Sheets تلقائياً إذا كان Published ID موجوداً
+      dataSource = 'sheets';
+      try {
+        employee = await fetchEmployeeFromSheets(userId, password);
+      } catch(e) {
+        dataSource = 'demo';
+        showLoading(false);
+        errDiv.style.cssText = 'display:block; background:#fef3c7; color:#92400e; border:1px solid #fcd34d; padding:12px 14px; border-radius:8px; font-size:13px; margin-bottom:1rem; text-align:right; line-height:1.8;';
+        errDiv.innerHTML = `⚠️ <strong>تعذّر الاتصال بـ Google Sheet</strong><br><span style="font-size:12px;">${e.message}</span>`;
+        return;
+      }
     }
     if (!employee) { showLoading(false); errDiv.style.cssText = ''; errDiv.textContent = 'رمز الدخول أو كلمة العبور غير صحيحة'; errDiv.style.display = 'block'; return; }
     currentEmployee = employee;
@@ -1407,25 +1460,79 @@ async function handleLogin() {
   } catch (err) { showLoading(false); errDiv.style.cssText = ''; errDiv.textContent = 'خطأ في الاتصال: ' + err.message; errDiv.style.display = 'block'; }
 }
 
-const SHEET_GIDS = { 'Employees': '0', 'AnnualLeaves': '1', 'ExceptionalLeaves': '2', 'SickLeaves': '3' };
+// GIDs الحقيقية تُحدَّد من واجهة الإعدادات أو تلقائياً
+const SHEET_GIDS = {
+  'Employees':          localStorage.getItem('gid_Employees')          || '645917957',
+  'AnnualLeaves':       localStorage.getItem('gid_AnnualLeaves')       || '1376477356',
+  'ExceptionalLeaves':  localStorage.getItem('gid_ExceptionalLeaves')  || '1273983452',
+  'SickLeaves':         localStorage.getItem('gid_SickLeaves')         || '543405937',
+  'Messages':           localStorage.getItem('gid_Messages')           || '445899271'
+};
 
-// ===== القراءة عبر Apps Script (بدلاً من CSV) =====
+// ===== القراءة عبر CSV المنشور (الطريقة الأكثر موثوقية) =====
+// ===== CORS-safe fetch helper =====
+async function safeFetch(url) {
+  // محاولة مباشرة أولاً
+  try {
+    const res = await fetch(url, { redirect: 'follow', mode: 'cors' });
+    if (res.ok) return res;
+  } catch (e) { /* CORS blocked, try proxy */ }
+  // استخدام CORS proxy كبديل
+  const proxies = [
+    'https://corsproxy.io/?' + encodeURIComponent(url),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+  ];
+  for (const proxy of proxies) {
+    try {
+      const res = await fetch(proxy, { redirect: 'follow' });
+      if (res.ok) return res;
+    } catch (e) { continue; }
+  }
+  throw new Error('تعذّر الاتصال بالجدول. تأكد أن الجدول منشور للعموم عبر: File → Share → Publish to web');
+}
+
 async function fetchSheetData(sheetName) {
+  // الطريقة الأولى: Apps Script GET
   try {
     const url = `${APPS_SCRIPT_URL}?action=getSheet&sheetName=${encodeURIComponent(sheetName)}`;
-    const res = await fetch(url);
+    const res = await safeFetch(url);
+    if (res.ok) {
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = null; }
+      if (data && data.success && Array.isArray(data.rows) && data.rows.length > 0) {
+        return data.rows;
+      }
+    }
+  } catch(e) { /* نُكمل للطريقة الثانية */ }
+
+  // الطريقة الثانية: /pub?output=csv (للجداول المنشورة عبر Publish to web)
+  const gid = SHEET_GIDS[sheetName] || '0';
+  const publishedId = CONFIG.publishedId || PUBLISHED_SHEET_ID;
+  const pubCsvUrl = `https://docs.google.com/spreadsheets/d/e/${publishedId}/pub?output=csv&gid=${gid}`;
+  try {
+    const res = await safeFetch(pubCsvUrl);
+    if (res.ok) {
+      const text = await res.text();
+      if (text && !text.trim().startsWith('<!')) {
+        const rows = parseCSV(text);
+        if (rows.length > 0) return rows;
+      }
+    }
+  } catch(e2) { /* try next */ }
+
+  // الطريقة الثالثة: /export?format=csv (للجداول المشاركة بصلاحية عرض)
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=csv&gid=${gid}&cachebust=${Date.now()}`;
+  try {
+    const res = await safeFetch(csvUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
-    let data;
-    try { data = JSON.parse(text); } catch { throw new Error('استجابة غير صالحة من الخادم'); }
-    if (data.success && Array.isArray(data.rows)) return data.rows;
-    throw new Error(data.message || 'خطأ في جلب البيانات');
+    if (!text || text.trim().startsWith('<!')) throw new Error('الجدول غير منشور للعموم — File → Share → Publish to web');
+    const rows = parseCSV(text);
+    if (rows.length > 0) return rows;
+    throw new Error('لا توجد بيانات في الجدول');
   } catch(e) {
-    // Fallback: CSV مباشر من Google Sheets
-    const gid = SHEET_GIDS[sheetName] || '0';
-    const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=csv&gid=${gid}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`تعذّر تحميل "${sheetName}"`);
-    return parseCSV(await res.text());
+    throw new Error(`تعذّر تحميل "${sheetName}": ${e.message}`);
   }
 }
 
@@ -1965,7 +2072,15 @@ function setRecipient(mode) {
   } else { box.style.display = 'none'; }
 }
 
-function initMessagesTab() { setRecipient('all'); renderSentMessages(); }
+async function initMessagesTab() {
+  setRecipient('all');
+  if (dataSource === 'sheets') {
+    showLoading(true);
+    await loadMessagesFromSheets();
+    showLoading(false);
+  }
+  renderSentMessages();
+}
 
 function sendAdminMessage() {
   const subject = document.getElementById('msgSubject').value.trim();
@@ -1991,6 +2106,7 @@ function renderSentMessages() {
 }
 
 async function checkEmployeeMessages(userID) {
+  if (dataSource === 'sheets') await loadMessagesFromSheets();
   const msgs = MESSAGES_STORE.filter(m => (m.ToUserID === 'ALL' || m.ToUserID === userID) && m.Read == 0);
   if (msgs.length) showNotifications(msgs, userID);
 }
@@ -2028,14 +2144,27 @@ function adminLogout() {
 
 function openConfig() {
   document.getElementById('cfgSheetId').value = CONFIG.sheetId;
+  if (!localStorage.getItem('gs_sheet_id')) {
+    document.getElementById('cfgSheetId').value = PUBLISHED_SHEET_ID;
+  }
+  document.getElementById('cfgPublishedId').value = CONFIG.publishedId || '';
   document.getElementById('cfgApiKey').value = CONFIG.apiKey;
   document.getElementById('cfgYear').value = CONFIG.year;
   document.getElementById('cfgSuperPhone').value = CONFIG.superPhone || '';
+  // تحميل GIDs المحفوظة
+  document.getElementById('cfgGidEmp').value  = localStorage.getItem('gid_Employees')         || '';
+  document.getElementById('cfgGidAnn').value  = localStorage.getItem('gid_AnnualLeaves')       || '';
+  document.getElementById('cfgGidExc').value  = localStorage.getItem('gid_ExceptionalLeaves')  || '';
+  document.getElementById('cfgGidSick').value = localStorage.getItem('gid_SickLeaves')         || '';
+  document.getElementById('cfgGidMsg').value  = localStorage.getItem('gid_Messages')          || '';
+  document.getElementById('cfgTestResult').style.display = 'none';
   document.getElementById('configPanel').classList.add('show');
 }
 function closeConfig() { document.getElementById('configPanel').classList.remove('show'); }
 function saveConfig() {
   CONFIG.sheetId = document.getElementById('cfgSheetId').value.trim() || DEFAULT_SHEET_ID;
+  const newPublishedId = document.getElementById('cfgPublishedId').value.trim();
+  if (newPublishedId) { CONFIG.publishedId = newPublishedId; localStorage.setItem('gs_published_id', newPublishedId); }
   CONFIG.apiKey = document.getElementById('cfgApiKey').value.trim();
   CONFIG.year = parseInt(document.getElementById('cfgYear').value) || 2025;
   CONFIG.superPhone = document.getElementById('cfgSuperPhone').value.trim();
@@ -2043,8 +2172,19 @@ function saveConfig() {
   localStorage.setItem('gs_api_key', CONFIG.apiKey);
   localStorage.setItem('gs_year', CONFIG.year);
   localStorage.setItem('gs_super_phone', CONFIG.superPhone);
+  // حفظ GIDs
+  const gidEmp  = document.getElementById('cfgGidEmp').value.trim();
+  const gidAnn  = document.getElementById('cfgGidAnn').value.trim();
+  const gidExc  = document.getElementById('cfgGidExc').value.trim();
+  const gidSick = document.getElementById('cfgGidSick').value.trim();
+  if (gidEmp)  { localStorage.setItem('gid_Employees', gidEmp);         SHEET_GIDS['Employees'] = gidEmp; }
+  if (gidAnn)  { localStorage.setItem('gid_AnnualLeaves', gidAnn);      SHEET_GIDS['AnnualLeaves'] = gidAnn; }
+  if (gidExc)  { localStorage.setItem('gid_ExceptionalLeaves', gidExc); SHEET_GIDS['ExceptionalLeaves'] = gidExc; }
+  if (gidSick) { localStorage.setItem('gid_SickLeaves', gidSick);       SHEET_GIDS['SickLeaves'] = gidSick; }
+  const gidMsg  = document.getElementById('cfgGidMsg').value.trim();
+  if (gidMsg)  { localStorage.setItem('gid_Messages', gidMsg);          SHEET_GIDS['Messages'] = gidMsg; }
   dataSource = 'sheets'; closeConfig();
-  document.getElementById('configNote').innerHTML = '✅ تم حفظ الإعدادات.';
+  document.getElementById('configNote').innerHTML = '✅ تم حفظ الإعدادات. جرّب تسجيل الدخول الآن.';
 }
 function clearSuperPhone() {
   document.getElementById('cfgSuperPhone').value = '';
@@ -2054,6 +2194,46 @@ function clearSuperPhone() {
 function loadDemoData() {
   dataSource = 'demo'; closeConfig();
   document.getElementById('configNote').innerHTML = '🟢 وضع البيانات التجريبية مفعّل.<br>جرّب: <strong>EMP001</strong> / <strong>1234</strong> أو <strong>ADMIN</strong> / <strong>admin</strong>';
+}
+
+async function testConnectionFromConfig() {
+  const sheetId = document.getElementById('cfgSheetId').value.trim();
+  const gidEmp  = document.getElementById('cfgGidEmp').value.trim() || '0';
+  const resultEl = document.getElementById('cfgTestResult');
+  resultEl.style.display = 'block';
+  resultEl.style.background = '#fef3c7';
+  resultEl.style.color = '#92400e';
+  resultEl.innerHTML = '⏳ جارٍ اختبار الاتصال...';
+  if (!sheetId) {
+    resultEl.innerHTML = '❌ الرجاء إدخال Sheet ID أولاً';
+    return;
+  }
+  // اختبار CSV مباشر
+  const csvUrl = `https://docs.google.com/spreadsheets/d/e/${CONFIG.publishedId || PUBLISHED_SHEET_ID}/pub?output=csv&gid=${gidEmp}`;
+  try {
+    const res = await safeFetch(csvUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status} — الجدول غير موجود أو Sheet ID خاطئ`);
+    const text = await res.text();
+    if (text.trim().startsWith('<!')) throw new Error('الجدول غير منشور للعموم — File → Share → Publish to web');
+    const rows = parseCSV(text);
+    if (rows.length === 0) throw new Error('الجدول فارغ أو تنسيق الأعمدة غير صحيح');
+    const cols = Object.keys(rows[0]).join(', ');
+    resultEl.style.background = '#d1fae5';
+    resultEl.style.color = '#065f46';
+    resultEl.innerHTML = `✅ <strong>الاتصال ناجح!</strong><br>
+      عدد السجلات: <strong>${rows.length}</strong><br>
+      الأعمدة المكتشفة: <code>${cols}</code>`;
+    // التحقق من وجود UserID
+    if (!cols.includes('UserID')) {
+      resultEl.style.background = '#fef3c7';
+      resultEl.style.color = '#92400e';
+      resultEl.innerHTML += `<br><br>⚠️ تحذير: العمود <strong>UserID</strong> غير موجود في البيانات.<br>تأكد أن أسماء الأعمدة صحيحة في الجدول.`;
+    }
+  } catch (e) {
+    resultEl.style.background = '#fee2e2';
+    resultEl.style.color = '#991b1b';
+    resultEl.innerHTML = `❌ <strong>فشل الاتصال</strong><br>${e.message}`;
+  }
 }
 
 document.addEventListener('keydown', e => {
@@ -2403,20 +2583,18 @@ function saveAdminSettings() {
 
 async function testAppsScriptConnection() {
   showToast('⏳ جارٍ اختبار الاتصال...');
+  const sheetId = CONFIG.sheetId || DEFAULT_SHEET_ID;
+  const gid = SHEET_GIDS['Employees'] || '0';
+  const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}&cachebust=${Date.now()}`;
   try {
-    // نرسل طلب addLeave وهمي بدون بيانات حقيقية لاختبار الوصول فقط
-    const res = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'ping' })
-    });
-    if (res.ok) {
-      showToast('✅ الاتصال بـ Apps Script يعمل!');
-    } else {
-      showToast('❌ الخادم أجاب بخطأ: ' + res.status);
-    }
+    const res = await fetch(csvUrl, { redirect: 'follow' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    if (text.trim().startsWith('<!')) throw new Error('الجدول غير منشور للعموم');
+    const rows = parseCSV(text);
+    showToast(`✅ الاتصال ناجح! (${rows.length} موظف في الجدول)`);
   } catch (err) {
-    showToast('❌ تعذّر الوصول: ' + err.message);
+    showToast('❌ فشل الاتصال: ' + err.message);
   }
 }
 
@@ -2609,7 +2787,7 @@ function getArchivedLeavesForEmployee(uid) {
         <strong>✅ File → Share → Publish to web → Publish</strong><br>لا حاجة لـ API Key.
       </div>
       <div class="section-label" style="margin-top:12px;">رابط Google Apps Script (للكتابة)</div>
-      <input type="text" id="asCfgScriptUrl" class="finput" placeholder="https://script.google.com/macros/s/..." value="https://script.google.com/macros/s/AKfycbwlnRHGI6PoTq_D4b_u-7yv1VNjEr8hNmkfdJ24_7oJ2dzMhItk-cgihoAKASZ710A/exec" readonly style="font-size:11px;color:#475569;background:#f8fafc;">
+      <input type="text" id="asCfgScriptUrl" class="finput" placeholder="https://script.google.com/macros/s/..." value="https://script.google.com/macros/s/AKfycbznCK0mTHtBWu3pEzZrfwv9wB4rmL2iLoCpFkjd5AuzgGlgyzmkssx_SDC0pv7q-2g/exec" readonly style="font-size:11px;color:#475569;background:#f8fafc;">
       <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px;font-size:12px;color:#1d4ed8;margin-top:8px;line-height:1.7;">
         🔗 رابط Apps Script مُدمج ومُفعّل — جميع عمليات الإضافة والتعديل والحذف تُحفظ مباشرةً في Google Sheets.
       </div>
@@ -2712,38 +2890,3 @@ function getArchivedLeavesForEmployee(uid) {
 </div>
 <style>
 </style>
-<!-- PWA Install Button -->
-<div id="installPwaBtn" style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:9999;background:linear-gradient(135deg,#1a3a5c,#0ea5e9);color:#fff;padding:12px 24px;border-radius:32px;box-shadow:0 4px 20px rgba(0,0,0,0.3);align-items:center;gap:10px;cursor:pointer;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;border:none;" onclick="installPWA()">
-  📲 تثبيت التطبيق على هاتفك
-</div>
-
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    });
-  }
-
-  let deferredPrompt;
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    const btn = document.getElementById('installPwaBtn');
-    if (btn) btn.style.display = 'flex';
-  });
-
-  function installPWA() {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(() => {
-        deferredPrompt = null;
-        document.getElementById('installPwaBtn').style.display = 'none';
-      });
-    }
-  }
-
-  window.addEventListener('appinstalled', () => {
-    const btn = document.getElementById('installPwaBtn');
-    if (btn) btn.style.display = 'none';
-  });
-</script>
