@@ -1237,7 +1237,7 @@
 <script>
 const DEFAULT_SHEET_ID = '15Cw54NIwiaP1roWcWLh4ir1DmlaaWDsS';
 const PUBLISHED_SHEET_ID = '2PACX-1vSHJtXcMzBD5boK7RYx__manAgWqk_k0UBgurAS1l0OfDliuojAbUY5R88tTmRWtw'; // الجدول المنشور للعموم
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyN0Q07_4kla2vRNEX4PXqgUfBqL1m6-UfZMt5GQnexUrfx_zHR6Z4i5xS2RZG_g6A/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlnRHGI6PoTq_D4b_u-7yv1VNjEr8hNmkfdJ24_7oJ2dzMhItk-cgihoAKASZ710A/exec';
 
 if (localStorage.getItem('gs_sheet_id') === '1-uYgHiLFq-fW79Fttr2nlWiHbMDe6QCy') {
   localStorage.setItem('gs_sheet_id', DEFAULT_SHEET_ID);
@@ -1254,44 +1254,30 @@ let CONFIG = {
 
 /* ===== APPS SCRIPT WRITE FUNCTIONS ===== */
 async function appsScriptCall(payload) {
-  // الطريقة الأولى: GET مع params (تعمل مع CORS)
   try {
+    // استخدام no-cors مع GET لتجنب مشاكل CORS مع Apps Script
+    // نُرسل البيانات عبر URL params بدلاً من POST body
     const params = new URLSearchParams({ data: JSON.stringify(payload) });
     const url = APPS_SCRIPT_URL + '?' + params.toString();
     const res = await fetch(url, { method: 'GET', redirect: 'follow' });
-    if (res.ok) {
-      const text = await res.text();
-      try { 
-        const data = JSON.parse(text);
-        if (data && typeof data.success !== 'undefined') return data;
-      } catch { }
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { success: false, error: text }; }
+    return data;
+  } catch (err) {
+    // محاولة بديلة عبر POST مع no-cors
+    try {
+      await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      // no-cors لا يُعيد response — نفترض النجاح
+      return { success: true, note: 'no-cors mode' };
+    } catch (err2) {
+      return { success: false, error: err2.message };
     }
-  } catch (err) { /* جرّب الطريقة التالية */ }
-
-  // الطريقة الثانية: POST مع no-cors (لا تُعيد response لكن تنفّذ العملية)
-  try {
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-    return { success: true, note: 'no-cors' };
-  } catch (err2) { /* جرّب الطريقة التالية */ }
-
-  // الطريقة الثالثة: GET عبر proxy
-  try {
-    const params = new URLSearchParams({ data: JSON.stringify(payload) });
-    const url = APPS_SCRIPT_URL + '?' + params.toString();
-    const proxy = 'https://corsproxy.io/?' + encodeURIComponent(url);
-    const res = await fetch(proxy, { method: 'GET' });
-    if (res.ok) {
-      const text = await res.text();
-      try { return JSON.parse(text); } catch { }
-    }
-    return { success: true, note: 'proxy' };
-  } catch (err3) {
-    return { success: false, error: err3.message };
   }
 }
 
@@ -1451,21 +1437,12 @@ async function handleLogin() {
         return;
       }
     } else {
-      // استخدام Google Sheets تلقائياً إذا كان Published ID موجوداً
-      dataSource = 'sheets';
-      try {
-        employee = await fetchEmployeeFromSheets(userId, password);
-      } catch(e) {
-        dataSource = 'demo';
-        showLoading(false);
-        errDiv.style.cssText = 'display:block; background:#fef3c7; color:#92400e; border:1px solid #fcd34d; padding:12px 14px; border-radius:8px; font-size:13px; margin-bottom:1rem; text-align:right; line-height:1.8;';
-        errDiv.innerHTML = `⚠️ <strong>تعذّر الاتصال بـ Google Sheet</strong><br><span style="font-size:12px;">${e.message}</span>`;
-        return;
-      }
+      employee = DEMO_DATA.employees.find(e => e.UserID.toUpperCase() === userId && e.Password === password);
+      if (employee) dataSource = 'demo';
     }
     if (!employee) { showLoading(false); errDiv.style.cssText = ''; errDiv.textContent = 'رمز الدخول أو كلمة العبور غير صحيحة'; errDiv.style.display = 'block'; return; }
     currentEmployee = employee;
-    if (employee.UserID.toUpperCase() === 'ADMIN' || employee.UserID === '7535' || employee.Role === 'admin') {
+    if (employee.UserID.toUpperCase() === 'ADMIN' || employee.Role === 'admin') {
       await renderAdminDashboard();
     } else {
       await renderDashboard();
@@ -2801,7 +2778,7 @@ function getArchivedLeavesForEmployee(uid) {
         <strong>✅ File → Share → Publish to web → Publish</strong><br>لا حاجة لـ API Key.
       </div>
       <div class="section-label" style="margin-top:12px;">رابط Google Apps Script (للكتابة)</div>
-      <input type="text" id="asCfgScriptUrl" class="finput" placeholder="https://script.google.com/macros/s/..." value="https://script.google.com/macros/s/AKfycbznCK0mTHtBWu3pEzZrfwv9wB4rmL2iLoCpFkjd5AuzgGlgyzmkssx_SDC0pv7q-2g/exec" readonly style="font-size:11px;color:#475569;background:#f8fafc;">
+      <input type="text" id="asCfgScriptUrl" class="finput" placeholder="https://script.google.com/macros/s/..." value="https://script.google.com/macros/s/AKfycbyN0Q07_4kla2vRNEX4PXqgUfBqL1m6-UfZMt5GQnexUrfx_zHR6Z4i5xS2RZG_g6A/exec" readonly style="font-size:11px;color:#475569;background:#f8fafc;">
       <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px;font-size:12px;color:#1d4ed8;margin-top:8px;line-height:1.7;">
         🔗 رابط Apps Script مُدمج ومُفعّل — جميع عمليات الإضافة والتعديل والحذف تُحفظ مباشرةً في Google Sheets.
       </div>
