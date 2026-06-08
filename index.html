@@ -1238,7 +1238,6 @@
 const DEFAULT_SHEET_ID = '15Cw54NIwiaP1roWcWLh4ir1DmlaaWDsS';
 const PUBLISHED_SHEET_ID = '2PACX-1vSHJtXcMzBD5boK7RYx__manAgWqk_k0UBgurAS1l0OfDliuojAbUY5R88tTmRWtw'; // الجدول المنشور للعموم
 const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzh4l9raAYVTJwjoslmNHtSCZrtWJqCX4AVL3RUzOYLb-9C3opoOPyBnArWi8Yl_O4/exec';
-// تحديث الرابط دائماً بالإصدار الجديد ومسح القديم من localStorage
 localStorage.setItem('gs_script_url', DEFAULT_APPS_SCRIPT_URL);
 const APPS_SCRIPT_URL = DEFAULT_APPS_SCRIPT_URL;
 
@@ -1257,26 +1256,26 @@ let CONFIG = {
 
 /* ===== APPS SCRIPT WRITE FUNCTIONS ===== */
 async function appsScriptCall(payload) {
-  // الطريقة الأولى: POST مع no-cors (تعمل دائماً مع Apps Script المنشور للعموم)
+  // الطريقة الأولى: GET عبر corsproxy.io (الأكثر موثوقية مع Apps Script)
   try {
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-    // no-cors لا يُعيد response قابل للقراءة — نفترض النجاح
-    return { success: true, note: 'no-cors' };
+    const params = new URLSearchParams({ data: JSON.stringify(payload) });
+    const targetUrl = APPS_SCRIPT_URL + '?' + params.toString();
+    const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
+    const res = await fetch(proxyUrl, { redirect: 'follow' });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { success: true, note: 'proxy-ok' }; }
+    return data;
   } catch (err) {
-    // الطريقة الثانية: GET عبر CORS proxy
+    // الطريقة الثانية: POST مع no-cors كخيار احتياطي
     try {
-      const params = new URLSearchParams({ data: JSON.stringify(payload) });
-      const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(APPS_SCRIPT_URL + '?' + params.toString());
-      const res = await fetch(proxyUrl, { redirect: 'follow' });
-      const text = await res.text();
-      let data;
-      try { data = JSON.parse(text); } catch { data = { success: true, note: 'proxy-fallback' }; }
-      return data;
+      await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      return { success: true, note: 'no-cors-fallback' };
     } catch (err2) {
       return { success: false, error: err2.message };
     }
