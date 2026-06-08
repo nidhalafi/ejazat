@@ -1238,7 +1238,9 @@
 const DEFAULT_SHEET_ID = '15Cw54NIwiaP1roWcWLh4ir1DmlaaWDsS';
 const PUBLISHED_SHEET_ID = '2PACX-1vSHJtXcMzBD5boK7RYx__manAgWqk_k0UBgurAS1l0OfDliuojAbUY5R88tTmRWtw'; // الجدول المنشور للعموم
 const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzh4l9raAYVTJwjoslmNHtSCZrtWJqCX4AVL3RUzOYLb-9C3opoOPyBnArWi8Yl_O4/exec';
-const APPS_SCRIPT_URL = localStorage.getItem('gs_script_url') || DEFAULT_APPS_SCRIPT_URL;
+// تحديث الرابط دائماً بالإصدار الجديد ومسح القديم من localStorage
+localStorage.setItem('gs_script_url', DEFAULT_APPS_SCRIPT_URL);
+const APPS_SCRIPT_URL = DEFAULT_APPS_SCRIPT_URL;
 
 if (localStorage.getItem('gs_sheet_id') === '1-uYgHiLFq-fW79Fttr2nlWiHbMDe6QCy') {
   localStorage.setItem('gs_sheet_id', DEFAULT_SHEET_ID);
