@@ -296,7 +296,12 @@
   .welcome-bar .emp-info h3 { font-size: 17px; font-weight: 700; }
   .welcome-bar .emp-info p { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 
-  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  .stat-card.sick { grid-column: 1 / -1; }
+  @media (min-width: 640px) {
+    .stats-grid { grid-template-columns: repeat(3, 1fr); }
+    .stat-card.sick { grid-column: auto; }
+  }
   .stat-card {
     background: white; border-radius: var(--radius); padding: 1.25rem 1.5rem;
     box-shadow: var(--shadow); border-top: 3px solid transparent; transition: transform 0.2s;
@@ -1555,6 +1560,14 @@ async function fetchLeavesFromSheets(sheetName, userId) {
   return all.filter(r => (r.UserID || '').toUpperCase() === userId.toUpperCase());
 }
 
+function filterLeavesByYear(leaves, year) {
+  return leaves.filter(r => {
+    const d = r.StartDate || r.EndDate || '';
+    if (!d) return true;
+    return String(new Date(d).getFullYear()) === String(year);
+  });
+}
+
 async function renderDashboard() {
   const emp = currentEmployee; const uid = emp.UserID.toUpperCase(); const year = CONFIG.year;
   let annualLeaves, exceptLeaves, sickLeaves;
@@ -1567,6 +1580,10 @@ async function renderDashboard() {
       fetchLeavesFromSheets('AnnualLeaves', uid), fetchLeavesFromSheets('ExceptionalLeaves', uid), fetchLeavesFromSheets('SickLeaves', uid),
     ]);
   }
+  // فلتر السنة الحالية فقط
+  annualLeaves = filterLeavesByYear(annualLeaves, year);
+  exceptLeaves = filterLeavesByYear(exceptLeaves, year);
+  sickLeaves   = filterLeavesByYear(sickLeaves, year);
   const annualUsed = annualLeaves.filter(r => r.Status === 'موافق عليه').reduce((s, r) => s + parseInt(r.Days || 0), 0);
   const exceptUsed = exceptLeaves.filter(r => r.Status === 'موافق عليه').reduce((s, r) => s + parseInt(r.Days || 0), 0);
   const sickUsed   = sickLeaves.reduce((s, r) => s + parseInt(r.Days || 0), 0);
