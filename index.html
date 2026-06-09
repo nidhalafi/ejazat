@@ -612,9 +612,79 @@
       <input type="password" id="password" placeholder="أدخل كلمة العبور">
     </div>
     <button class="btn-primary" onclick="handleLogin()">تسجيل الدخول</button>
-    <div class="config-note" id="configNote">
-      🔥 مرتبط بـ Firebase — قاعدة بيانات آمنة وفورية<br>
-      <span style="font-size:11px; opacity:0.8;">مركز إصلاح الأطفال الجانحين سوق الجديد</span>
+    <div id="configNote" style="display:none;background:#d1fae5;border:1px solid #6ee7b7;border-radius:10px;padding:12px;font-size:12px;color:#065f46;margin-top:1rem;text-align:center;line-height:1.7;"></div>
+    <button type="button" onclick="openForgotModal()"
+      style="width:100%;margin-top:1rem;padding:11px;border:1.5px solid #e2e8f0;border-radius:10px;background:#f8fafc;font-family:var(--font);font-size:14px;font-weight:600;color:#475569;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.2s;"
+      onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background='#f8fafc'">
+      <span style="font-size:18px;">🔑</span> نسيت كلمة المرور؟ تواصل مع المشرف
+    </button>
+  </div>
+</div>
+
+<!-- FORGOT PASSWORD MODAL -->
+<div id="forgotModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10500;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:20px;width:92%;max-width:400px;font-family:var(--font);direction:rtl;box-shadow:0 24px 60px rgba(0,0,0,0.3);overflow:hidden;">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1a3a5c,#0ea5e9);color:#fff;padding:20px 20px 16px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:22px;">🔑</span>
+        <div>
+          <div style="font-weight:700;font-size:15px;">نسيت كلمة المرور؟</div>
+          <div style="font-size:11px;opacity:0.8;">تواصل مع المشرف للمساعدة</div>
+        </div>
+      </div>
+      <button onclick="closeForgotModal()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;">✕</button>
+    </div>
+    <div style="padding:24px;">
+      <!-- Supervisor info -->
+      <div id="forgotSuperInfo" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:14px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#059669,#10b981);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📞</div>
+        <div>
+          <div style="font-size:12px;color:#64748b;">المشرف المسؤول</div>
+          <div id="forgotSuperName" style="font-weight:700;font-size:15px;color:#0f172a;"></div>
+          <div id="forgotSuperPhone" style="font-size:13px;color:#0369a1;font-weight:600;direction:ltr;text-align:right;"></div>
+        </div>
+      </div>
+      <div id="forgotNoSuper" style="display:none;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:12px;text-align:center;font-size:13px;color:#92400e;margin-bottom:16px;">
+        ⚠️ لم يتم تسجيل رقم المشرف بعد. تواصل مع إدارة النظام.
+      </div>
+
+      <!-- Call button -->
+      <a id="forgotCallBtn" href="#" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:10px;font-family:var(--font);font-size:15px;font-weight:700;text-decoration:none;margin-bottom:12px;box-sizing:border-box;">
+        📞 اتصل بالمشرف الآن
+      </a>
+
+      <!-- Divider -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <hr style="flex:1;border:none;border-top:1px solid #e2e8f0;">
+        <span style="font-size:12px;color:#94a3b8;">أو</span>
+        <hr style="flex:1;border:none;border-top:1px solid #e2e8f0;">
+      </div>
+
+      <!-- Change password directly -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+        <div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:12px;">🔒 تغيير كلمة المرور مباشرة</div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">رمز الدخول</label>
+          <input id="forgotUserId" type="text" placeholder="أدخل رمز الدخول"
+            style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:var(--font);font-size:14px;direction:ltr;text-align:center;outline:none;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">كلمة المرور الحالية</label>
+          <input id="forgotOldPwd" type="password" placeholder="كلمة المرور الحالية"
+            style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:var(--font);font-size:14px;direction:ltr;text-align:center;outline:none;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">كلمة المرور الجديدة</label>
+          <input id="forgotNewPwd" type="password" placeholder="كلمة المرور الجديدة"
+            style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-family:var(--font);font-size:14px;direction:ltr;text-align:center;outline:none;box-sizing:border-box;">
+        </div>
+        <div id="forgotChangeMsg" style="display:none;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:10px;text-align:center;"></div>
+        <button onclick="doForgotChangePassword()"
+          style="width:100%;padding:11px;background:linear-gradient(135deg,#1a3a5c,#0ea5e9);color:#fff;border:none;border-radius:8px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;">
+          💾 تغيير كلمة المرور
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -2288,7 +2358,7 @@ function saveConfig() {
   const gidMsg  = document.getElementById('cfgGidMsg').value.trim();
   if (gidMsg)  { localStorage.setItem('gid_Messages', gidMsg);          SHEET_GIDS['Messages'] = gidMsg; }
   dataSource = 'sheets'; closeConfig();
-  document.getElementById('configNote').innerHTML = '✅ تم حفظ الإعدادات. جرّب تسجيل الدخول الآن.';
+  const cn=document.getElementById('configNote'); cn.style.display='block'; cn.innerHTML='✅ تم حفظ الإعدادات. جرّب تسجيل الدخول الآن.';
 }
 function clearSuperPhone() {
   document.getElementById('cfgSuperPhone').value = '';
@@ -2297,7 +2367,7 @@ function clearSuperPhone() {
 }
 function loadDemoData() {
   dataSource = 'demo'; closeConfig();
-  document.getElementById('configNote').innerHTML = '🟢 وضع البيانات التجريبية مفعّل.<br>جرّب: <strong>EMP001</strong> / <strong>1234</strong> أو <strong>ADMIN</strong> / <strong>admin</strong>';
+  const cn2=document.getElementById('configNote'); cn2.style.display='block'; cn2.innerHTML='🟢 وضع البيانات التجريبية مفعّل. جرّب: <strong>EMP001</strong> / <strong>1234</strong> أو <strong>ADMIN</strong> / <strong>admin</strong>';
 }
 
 async function testConnectionFromConfig() {
@@ -2512,6 +2582,78 @@ function openPhoneModal() {
   document.getElementById('phoneModalCallLink').href = 'tel:' + phone;
   document.getElementById('phoneModalOverlay').classList.add('open');
   closeSidebar();
+}
+
+function openForgotModal() {
+  const phone = CONFIG.superPhone;
+  const name  = CONFIG.supervisorName || 'المشرف';
+  const hasPhone = !!phone;
+  document.getElementById('forgotSuperInfo').style.display = hasPhone ? 'flex' : 'none';
+  document.getElementById('forgotNoSuper').style.display   = hasPhone ? 'none' : 'block';
+  document.getElementById('forgotCallBtn').style.display   = hasPhone ? 'flex' : 'none';
+  if (hasPhone) {
+    document.getElementById('forgotSuperName').textContent  = name;
+    document.getElementById('forgotSuperPhone').textContent = phone;
+    document.getElementById('forgotCallBtn').href = 'tel:' + phone;
+  }
+  // pre-fill user id from login field
+  const uid = document.getElementById('userId').value.trim();
+  if (uid) document.getElementById('forgotUserId').value = uid;
+  document.getElementById('forgotOldPwd').value = '';
+  document.getElementById('forgotNewPwd').value = '';
+  document.getElementById('forgotChangeMsg').style.display = 'none';
+  document.getElementById('forgotModal').style.display = 'flex';
+}
+
+function closeForgotModal() {
+  document.getElementById('forgotModal').style.display = 'none';
+}
+
+async function doForgotChangePassword() {
+  const userId = document.getElementById('forgotUserId').value.trim().toUpperCase();
+  const oldPwd = document.getElementById('forgotOldPwd').value.trim();
+  const newPwd = document.getElementById('forgotNewPwd').value.trim();
+  const msgEl  = document.getElementById('forgotChangeMsg');
+
+  function showMsg(txt, ok) {
+    msgEl.style.cssText = `display:block;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:10px;text-align:center;background:${ok?'#d1fae5':'#fee2e2'};color:${ok?'#065f46':'#dc2626'};border:1px solid ${ok?'#6ee7b7':'#fca5a5'};`;
+    msgEl.textContent = txt;
+  }
+
+  if (!userId || !oldPwd || !newPwd) { showMsg('⚠️ يرجى ملء جميع الحقول', false); return; }
+  if (newPwd.length < 3) { showMsg('⚠️ كلمة المرور الجديدة قصيرة جداً', false); return; }
+  if (oldPwd === newPwd) { showMsg('⚠️ كلمة المرور الجديدة مطابقة للقديمة', false); return; }
+
+  showMsg('⏳ جارٍ التحقق...', true);
+
+  try {
+    // Verify current password via Firebase
+    let emp = null;
+    if (dataSource === 'sheets' || !dataSource) {
+      emp = await window._fb.fetchEmployeeFromSheets(userId, oldPwd);
+    } else {
+      emp = DEMO_DATA.employees.find(e => e.UserID === userId && e.Password === oldPwd) || null;
+    }
+
+    if (!emp) { showMsg('❌ رمز الدخول أو كلمة المرور الحالية غير صحيحة', false); return; }
+
+    emp.Password = newPwd;
+    if (dataSource === 'sheets' || !dataSource) {
+      await window._fb.syncUpdateEmployee(emp);
+    } else {
+      const idx = DEMO_DATA.employees.findIndex(e => e.UserID === userId);
+      if (idx > -1) DEMO_DATA.employees[idx].Password = newPwd;
+    }
+
+    showMsg('✅ تم تغيير كلمة المرور بنجاح', true);
+    document.getElementById('forgotOldPwd').value = '';
+    document.getElementById('forgotNewPwd').value = '';
+    // Pre-fill login password field
+    document.getElementById('password').value = newPwd;
+    setTimeout(closeForgotModal, 2000);
+  } catch(e) {
+    showMsg('❌ خطأ: ' + e.message, false);
+  }
 }
 
 function closePhoneModal() {
