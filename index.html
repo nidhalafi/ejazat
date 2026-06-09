@@ -453,8 +453,10 @@
     .tabs-nav { overflow-x: auto; flex-wrap: nowrap; padding: 4px; gap: 3px; }
     .tab-btn { font-size: 12px; padding: 8px 6px; white-space: nowrap; flex: none; }
 
-    /* Leave tables → cards on mobile */
-    .leave-table { display: none !important; }
+    /* Leave tables → scrollable on mobile */
+    .leave-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .leave-table { min-width: 480px; font-size: 12px; }
+    .leave-table th, .leave-table td { padding: 9px 10px; }
     .mobile-card { display: block; }
 
     /* Admin header tabs */
@@ -745,21 +747,21 @@
     <div class="tab-panel active" id="tab-annual">
       <div class="section-card">
         <div class="section-header"><div><h3>الإجازات السنوية</h3><p>سجل الإجازات السنوية المستمتع بها ووضعية المطالب</p></div></div>
-        <table class="leave-table"><thead><tr><th>#</th><th>تاريخ البداية</th><th>تاريخ النهاية</th><th>عدد الأيام</th><th>الوضعية</th><th>ملاحظة</th></tr></thead><tbody id="annualTableBody"></tbody></table>
+        <div class="leave-table-wrap"><table class="leave-table"><thead><tr><th>#</th><th>تاريخ البداية</th><th>تاريخ النهاية</th><th>عدد الأيام</th><th>الوضعية</th><th>ملاحظة</th></tr></thead><tbody id="annualTableBody"></tbody></table></div>
       </div>
     </div>
 
     <div class="tab-panel" id="tab-exceptional">
       <div class="section-card">
         <div class="section-header"><div><h3>الإجازات الاستثنائية</h3><p>الحق السنوي: 6 أيام استثنائية</p></div></div>
-        <table class="leave-table"><thead><tr><th>#</th><th>تاريخ البداية</th><th>تاريخ النهاية</th><th>عدد الأيام</th><th>السبب</th><th>الوضعية</th></tr></thead><tbody id="exceptTableBody"></tbody></table>
+        <div class="leave-table-wrap"><table class="leave-table"><thead><tr><th>#</th><th>تاريخ البداية</th><th>تاريخ النهاية</th><th>عدد الأيام</th><th>السبب</th><th>الوضعية</th></tr></thead><tbody id="exceptTableBody"></tbody></table></div>
       </div>
     </div>
 
     <div class="tab-panel" id="tab-sick">
       <div class="section-card">
         <div class="section-header"><div><h3>الإجازات المرضية</h3><p>سجل الإجازات المرضية المستمتع بها (للاطلاع فقط)</p></div></div>
-        <table class="leave-table"><thead><tr><th>#</th><th>تاريخ البداية</th><th>تاريخ النهاية</th><th>عدد الأيام</th><th>التشخيص / الملاحظة</th></tr></thead><tbody id="sickTableBody"></tbody></table>
+        <div class="leave-table-wrap"><table class="leave-table"><thead><tr><th>#</th><th>تاريخ البداية</th><th>تاريخ النهاية</th><th>عدد الأيام</th><th>التشخيص / الملاحظة</th></tr></thead><tbody id="sickTableBody"></tbody></table></div>
       </div>
     </div>
     <!-- Archive panels injected dynamically -->
@@ -1362,8 +1364,19 @@ async function loadMessagesFromSheets() {
 async function saveMessageToSheets(msg) {
   try {
     const data = { ...msg }; delete data._docId;
-    await addDoc(collection(db, 'Messages'), data);
+    const ref = await addDoc(collection(db, 'Messages'), data);
+    msg._docId = ref.id;
   } catch(e) { console.error('Message save error:', e); }
+}
+
+async function markMessageRead(docId) {
+  if (!docId) return;
+  try { await updateDoc(doc(db, 'Messages', docId), { Read: 1 }); } catch(e) { console.error('markRead error:', e); }
+}
+
+async function deleteMessageFromSheets(docId) {
+  if (!docId) return;
+  try { await deleteDoc(doc(db, 'Messages', docId)); } catch(e) { console.error('deleteMsg error:', e); }
 }
 
 // --- Fetch all employees (admin) ---
@@ -1389,7 +1402,9 @@ window._fb = {
   syncDeleteLeave,
   syncUpdateStatus,
   loadMessagesFromSheets,
-  saveMessageToSheets
+  saveMessageToSheets,
+  markMessageRead,
+  deleteMessageFromSheets
 };
 
 </script>
@@ -1479,11 +1494,21 @@ async function handleLogin() {
   } catch (err) { showLoading(false); errDiv.style.cssText = ''; errDiv.textContent = 'خطأ في الاتصال: ' + err.message; errDiv.style.display = 'block'; }
 }
 
+function parseLeaveDate(d) {
+  if (!d) return null;
+  if (typeof d === 'object' && d.seconds) return new Date(d.seconds * 1000);
+  if (typeof d === 'object' && typeof d.toDate === 'function') return d.toDate();
+  const parsed = new Date(d);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function filterLeavesByYear(leaves, year) {
   return leaves.filter(r => {
-    const d = r.StartDate || r.EndDate || '';
+    const raw = r.StartDate || r.EndDate;
+    if (!raw) return true;
+    const d = parseLeaveDate(raw);
     if (!d) return true;
-    return String(new Date(d).getFullYear()) === String(year);
+    return String(d.getFullYear()) === String(year);
   });
 }
 
@@ -1564,7 +1589,11 @@ function renderSickTable(leaves) {
 
 function formatDate(d) {
   if (!d) return '—';
-  try { return new Date(d).toLocaleDateString('ar-TN', {year:'numeric', month:'short', day:'numeric'}); } catch { return d; }
+  try {
+    const dt = parseLeaveDate(d);
+    if (!dt) return String(d);
+    return dt.toLocaleDateString('ar-TN', {year:'numeric', month:'short', day:'numeric'});
+  } catch { return String(d); }
 }
 function showLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none'; }
 function switchTab(name, btn) {
@@ -2020,7 +2049,9 @@ function sendAdminMessage() {
   if (recipientMode === 'all') { targets = ['ALL']; }
   else { document.querySelectorAll('#empCheckboxes input[type=checkbox]:checked').forEach(cb => targets.push(cb.value)); if (!targets.length) { alert('الرجاء تحديد موظف واحد على الأقل'); return; } }
   const today = new Date().toISOString().split('T')[0];
-  targets.forEach(uid => { MESSAGES_STORE.push({ MessageID: 'MSG'+Date.now()+Math.random().toString(36).slice(2,5), ToUserID: uid, FromUserID: 'ADMIN', Date: today, Subject: subject, Body: body, Read: 0 }); });
+  const newMsgs = targets.map(uid => ({ MessageID: 'MSG'+Date.now()+Math.random().toString(36).slice(2,5), ToUserID: uid, FromUserID: 'ADMIN', Date: today, Subject: subject, Body: body, Read: 0 }));
+  newMsgs.forEach(msg => MESSAGES_STORE.push(msg));
+  if (dataSource === 'sheets') { newMsgs.forEach(msg => window._fb.saveMessageToSheets(msg)); }
   document.getElementById('msgSubject').value = ''; document.getElementById('msgBody').value = '';
   setRecipient('all'); renderSentMessages(); showToast('✅ تم إرسال الرسالة بنجاح');
 }
@@ -2029,10 +2060,34 @@ function renderSentMessages() {
   const sent = [...MESSAGES_STORE].filter(m => m.FromUserID === 'ADMIN').reverse();
   const el = document.getElementById('sentMessagesList');
   if (!sent.length) { el.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted); font-size:13px;">لا توجد رسائل مُرسلة</div>'; return; }
-  el.innerHTML = sent.map(m => {
+  el.innerHTML = sent.map((m, i) => {
     const toLabel = m.ToUserID === 'ALL' ? '<span style="background:#dbeafe;color:#1d4ed8;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;">📢 جميع الموظفين</span>' : `<span style="background:#f0fdf4;color:#15803d;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;">👤 ${m.ToUserID}</span>`;
-    return `<div class="msg-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px;"><div style="font-weight:700;font-size:14px;color:var(--text-dark);">${m.Subject}</div><div style="display:flex;gap:6px;align-items:center;">${toLabel}<span style="font-size:11px;color:var(--text-muted);">${m.Date}</span></div></div><div style="font-size:13px;color:#475569;line-height:1.7;">${m.Body}</div></div>`;
+    const readCount = MESSAGES_STORE.filter(r => r.Subject === m.Subject && r.Date === m.Date && r.Read == 1).length;
+    const totalCount = MESSAGES_STORE.filter(r => r.Subject === m.Subject && r.Date === m.Date).length;
+    return `<div class="msg-card" style="position:relative;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+        <div style="font-weight:700;font-size:14px;color:var(--text-dark);">${m.Subject}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">${toLabel}<span style="font-size:11px;color:var(--text-muted);">${m.Date}</span>
+          <span style="font-size:11px;background:#f0f4f8;color:#64748b;padding:2px 8px;border-radius:10px;">👁 ${readCount}/${totalCount} اطّلع</span>
+          <button onclick="deleteAdminMessage('${m._docId || ''}','${m.MessageID}')" style="padding:3px 10px;border:1px solid #fca5a5;border-radius:6px;background:#fee2e2;color:#dc2626;cursor:pointer;font-size:12px;font-family:var(--font);">🗑️</button>
+        </div>
+      </div>
+      <div style="font-size:13px;color:#475569;line-height:1.7;">${m.Body}</div>
+    </div>`;
   }).join('');
+}
+
+function deleteAdminMessage(docId, messageId) {
+  if (!confirm('هل تريد حذف هذه الرسالة؟')) return;
+  // Remove all copies from store (ALL + individual)
+  const toRemove = MESSAGES_STORE.filter(m => m._docId === docId || m.MessageID === messageId);
+  toRemove.forEach(m => {
+    const idx = MESSAGES_STORE.indexOf(m);
+    if (idx > -1) MESSAGES_STORE.splice(idx, 1);
+    if (dataSource === 'sheets' && m._docId) window._fb.deleteMessageFromSheets(m._docId);
+  });
+  renderSentMessages();
+  showToast('🗑️ تم حذف الرسالة');
 }
 
 async function checkEmployeeMessages(userID) {
@@ -2051,15 +2106,32 @@ function showNotifications(msgs, userID) {
     overlay.innerHTML = `<div class="notif-card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
         <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#1a3a5c,#2563eb);display:flex;align-items:center;justify-content:center;font-size:18px;">✉️</div>
-        <div><div style="font-size:11px;color:var(--text-muted);">رسالة من الإدارة — ${m.Date}</div><div style="font-weight:700;font-size:15px;color:var(--text-dark);">${m.Subject}</div></div>
+        <div style="flex:1;"><div style="font-size:11px;color:var(--text-muted);">رسالة من الإدارة — ${m.Date}</div><div style="font-weight:700;font-size:15px;color:var(--text-dark);">${m.Subject}</div></div>
       </div>
       <div style="background:#f8fafc;border-radius:10px;padding:14px;font-size:14px;color:#374151;line-height:1.8;margin-bottom:20px;">${m.Body}</div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+        <button id="deleteMsgBtn" style="padding:10px 16px;border:1px solid #fca5a5;border-radius:8px;background:#fee2e2;color:#dc2626;cursor:pointer;font-size:13px;font-family:var(--font);font-weight:600;">🗑️ حذف</button>
         ${hasNext ? `<button id="nextMsgBtn" style="padding:10px 18px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;font-size:13px;font-family:var(--font);">التالي (${remaining})</button>` : ''}
         <button id="markReadBtn" class="btn-primary" style="font-size:13px;width:auto;padding:10px 18px;">تم الاطلاع ✓</button>
       </div></div>`;
     document.body.appendChild(overlay);
-    overlay.querySelector('#markReadBtn').addEventListener('click', () => { m.Read = 1; overlay.remove(); currentIdx++; showOne(); });
+
+    // Mark as read: update local + Firebase
+    function markRead() {
+      m.Read = 1;
+      if (dataSource === 'sheets' && m._docId) window._fb.markMessageRead(m._docId);
+      overlay.remove(); currentIdx++; showOne();
+    }
+    // Delete: remove from store + Firebase
+    function deleteMsg() {
+      const idx = MESSAGES_STORE.indexOf(m);
+      if (idx > -1) MESSAGES_STORE.splice(idx, 1);
+      if (dataSource === 'sheets' && m._docId) window._fb.deleteMessageFromSheets(m._docId);
+      overlay.remove(); currentIdx++; showOne();
+    }
+
+    overlay.querySelector('#markReadBtn').addEventListener('click', markRead);
+    overlay.querySelector('#deleteMsgBtn').addEventListener('click', deleteMsg);
     if (hasNext) overlay.querySelector('#nextMsgBtn').addEventListener('click', () => { overlay.remove(); currentIdx++; showOne(); });
   }
   showOne();
