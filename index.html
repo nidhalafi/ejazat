@@ -1239,152 +1239,166 @@
   <div class="loading-text">جارٍ تحميل البيانات...</div>
 </div>
 
-<script>
-const DEFAULT_SHEET_ID = '15Cw54NIwiaP1roWcWLh4ir1DmlaaWDsS';
-const PUBLISHED_SHEET_ID = '2PACX-1vSHJtXcMzBD5boK7RYx__manAgWqk_k0UBgurAS1l0OfDliuojAbUY5R88tTmRWtw'; // الجدول المنشور للعموم
-const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwOAcW8CoTRCpG-IbFHq-Y-oADax7qFff5c3MRB_C5qz89gEcetANDUUqDTwGoxjrU/exec';
-localStorage.setItem('gs_script_url', DEFAULT_APPS_SCRIPT_URL);
-const APPS_SCRIPT_URL = DEFAULT_APPS_SCRIPT_URL;
+<script type="module">
+// ===== FIREBASE FIRESTORE =====
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+import {
+  getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, setDoc
+} from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 
-if (localStorage.getItem('gs_sheet_id') === '1-uYgHiLFq-fW79Fttr2nlWiHbMDe6QCy') {
-  localStorage.setItem('gs_sheet_id', DEFAULT_SHEET_ID);
-}
+const firebaseConfig = {
+  apiKey: "AIzaSyCFKnfOxXEjKjYEvqMckoo7eI_Rc56oOBI",
+  authDomain: "ejazat-1a83a.firebaseapp.com",
+  projectId: "ejazat-1a83a",
+  storageBucket: "ejazat-1a83a.firebasestorage.app",
+  messagingSenderId: "927351409672",
+  appId: "1:927351409672:web:5c59596a3376a1e10c55bd"
+};
 
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ===== CONFIG =====
 let CONFIG = {
-  sheetId: localStorage.getItem('gs_sheet_id') || DEFAULT_SHEET_ID,
-  publishedId: localStorage.getItem('gs_published_id') || PUBLISHED_SHEET_ID,
-  apiKey:  localStorage.getItem('gs_api_key')  || '',
-  year:    parseInt(localStorage.getItem('gs_year') || '2025'),
+  year: parseInt(localStorage.getItem('gs_year') || '2026'),
   superPhone: localStorage.getItem('gs_super_phone') || '',
   supervisorName: localStorage.getItem('gs_super_name') || ''
 };
 
-/* ===== APPS SCRIPT WRITE FUNCTIONS ===== */
-async function appsScriptCall(payload) {
-  // POST مباشر بدون proxy — يعمل مع Apps Script الجديد
-  try {
-    const res = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload),
-      redirect: 'follow'
-    });
-    const text = await res.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = { success: true, note: 'ok' }; }
-    return data;
-  } catch (err) {
-    try {
-      await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
-      });
-      return { success: true, note: 'no-cors-fallback' };
-    } catch (err2) {
-      return { success: false, error: err2.message };
-    }
-  }
-}
+// ===== FIRESTORE CRUD =====
 
-// ===== SYNC FUNCTIONS (متوافقة مع Apps Script) =====
-// Apps Script يبحث بـ UserID + StartDate للإجازات، وبـ UserID للموظفين
-// البنية: { action, sheetName, row, userID, startDate }
+// --- Employees ---
+async function fetchEmployeeFromSheets(userId, password) {
+  const q = query(collection(db, 'Employees'), where('UserID', '==', userId.toUpperCase()));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  const emp = snap.docs[0].data();
+  emp._docId = snap.docs[0].id;
+  if (emp.Password !== password) return null;
+  return emp;
+}
 
 async function syncAddEmployee(emp) {
   if (dataSource !== 'sheets') return true;
-  // Apps Script: addEmployee => sheet.appendRow(data.row)
-  const row = [emp.UserID, emp.Password, emp.Name, emp.Department, emp.Grade];
-  const result = await appsScriptCall({ action: 'addEmployee', row });
-  if (!result.success) { showToast('⚠️ تعذّر الحفظ في Google Sheet: ' + (result.error || '')); return false; }
-  return true;
+  try {
+    await setDoc(doc(db, 'Employees', emp.UserID.toUpperCase()), emp);
+    return true;
+  } catch(e) { showToast('⚠️ خطأ في الحفظ: ' + e.message); return false; }
 }
 
 async function syncUpdateEmployee(emp) {
   if (dataSource !== 'sheets') return true;
-  // Apps Script: updateEmployee => يبحث بـ rows[i][0] === userID
-  const row = [emp.UserID, emp.Password, emp.Name, emp.Department, emp.Grade];
-  const result = await appsScriptCall({ action: 'updateEmployee', userID: emp.UserID, row });
-  if (!result.success) { showToast('⚠️ تعذّر التحديث في Google Sheet: ' + (result.error || '')); return false; }
-  return true;
+  try {
+    await setDoc(doc(db, 'Employees', emp.UserID.toUpperCase()), emp);
+    return true;
+  } catch(e) { showToast('⚠️ خطأ في التحديث: ' + e.message); return false; }
 }
 
 async function syncDeleteEmployee(uid) {
   if (dataSource !== 'sheets') return true;
-  // Apps Script: deleteEmployee => يبحث بـ rows[i][0] === userID
-  const result = await appsScriptCall({ action: 'deleteEmployee', userID: uid });
-  if (!result.success) { showToast('⚠️ تعذّر الحذف من Google Sheet: ' + (result.error || '')); return false; }
-  return true;
+  try {
+    await deleteDoc(doc(db, 'Employees', uid.toUpperCase()));
+    return true;
+  } catch(e) { showToast('⚠️ خطأ في الحذف: ' + e.message); return false; }
 }
 
-function leaveToRow(type, r) {
-  if (type === 'AnnualLeaves')      return [r.UserID, r.StartDate, r.EndDate, r.Days, r.Status, r.Note || ''];
-  if (type === 'ExceptionalLeaves') return [r.UserID, r.StartDate, r.EndDate, r.Days, r.Reason || '', r.Status];
-  if (type === 'SickLeaves')        return [r.UserID, r.StartDate, r.EndDate, r.Days, r.Note || ''];
-  return [];
+// --- Leaves ---
+async function fetchLeavesFromSheets(colName, userId) {
+  const q = query(collection(db, colName), where('UserID', '==', userId.toUpperCase()));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
 }
 
-async function syncAddLeave(sheetName, r) {
+async function fetchAllLeavesFromSheets(colName) {
+  const snap = await getDocs(collection(db, colName));
+  return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+}
+
+async function syncAddLeave(colName, r) {
   if (dataSource !== 'sheets') return true;
-  // Apps Script: addLeave => sheet.appendRow(data.row)
-  const row = leaveToRow(sheetName, r);
-  const result = await appsScriptCall({ action: 'addLeave', sheetName, row });
-  if (!result.success) { showToast('⚠️ تعذّر الحفظ في Google Sheet: ' + (result.error || '')); return false; }
-  return true;
+  try {
+    const data = { ...r }; delete data._docId;
+    data.UserID = data.UserID.toUpperCase();
+    const ref = await addDoc(collection(db, colName), data);
+    r._docId = ref.id;
+    return true;
+  } catch(e) { showToast('⚠️ خطأ في الحفظ: ' + e.message); return false; }
 }
 
-async function syncUpdateLeave(sheetName, originalRow, updatedRow) {
+async function syncUpdateLeave(colName, originalRow, updatedRow) {
   if (dataSource !== 'sheets') return true;
-  // Apps Script: updateLeave => يبحث بـ UserID + startDate (الأصلية) ثم يكتب البيانات الجديدة
-  const row = leaveToRow(sheetName, updatedRow || originalRow);
-  const result = await appsScriptCall({
-    action: 'updateLeave',
-    sheetName,
-    userID: originalRow.UserID,
-    startDate: originalRow.StartDate,
-    row
-  });
-  if (!result.success) { showToast('⚠️ تعذّر التحديث في Google Sheet: ' + (result.error || '')); return false; }
-  return true;
+  try {
+    const target = updatedRow || originalRow;
+    const data = { ...target }; delete data._docId;
+    data.UserID = data.UserID.toUpperCase();
+    if (originalRow._docId) {
+      await updateDoc(doc(db, colName, originalRow._docId), data);
+    }
+    return true;
+  } catch(e) { showToast('⚠️ خطأ في التحديث: ' + e.message); return false; }
 }
 
-async function syncDeleteLeave(sheetName, r) {
+async function syncDeleteLeave(colName, r) {
   if (dataSource !== 'sheets') return true;
-  // Apps Script: deleteLeave => يبحث بـ UserID + startDate
-  const result = await appsScriptCall({ action: 'deleteLeave', sheetName, userID: r.UserID, startDate: r.StartDate });
-  if (!result.success) { showToast('⚠️ تعذّر الحذف من Google Sheet: ' + (result.error || '')); return false; }
-  return true;
+  try {
+    if (r._docId) await deleteDoc(doc(db, colName, r._docId));
+    return true;
+  } catch(e) { showToast('⚠️ خطأ في الحذف: ' + e.message); return false; }
 }
 
-async function syncUpdateStatus(sheetName, r, status) {
+async function syncUpdateStatus(colName, r, status) {
   if (dataSource !== 'sheets') return true;
-  // Apps Script لا يملك updateStatus منفصلاً، نستخدم updateLeave مع الحالة الجديدة
   const updated = { ...r, Status: status };
-  return await syncUpdateLeave(sheetName, r, updated);
+  return await syncUpdateLeave(colName, r, updated);
 }
 
+// --- Messages ---
+async function loadMessagesFromSheets() {
+  try {
+    const snap = await getDocs(collection(db, 'Messages'));
+    MESSAGES_STORE = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+  } catch(e) { MESSAGES_STORE = []; }
+}
+
+async function saveMessageToSheets(msg) {
+  try {
+    const data = { ...msg }; delete data._docId;
+    await addDoc(collection(db, 'Messages'), data);
+  } catch(e) { console.error('Message save error:', e); }
+}
+
+// --- Fetch all employees (admin) ---
+async function fetchAllEmployees() {
+  const snap = await getDocs(collection(db, 'Employees'));
+  return snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
+}
+
+// ===== Expose Firebase functions to global scope =====
+window._fb = {
+  fetchEmployeeFromSheets,
+  fetchLeavesFromSheets,
+  fetchAllLeavesFromSheets,
+  fetchAllEmployees,
+  syncAddEmployee,
+  syncUpdateEmployee,
+  syncDeleteEmployee,
+  syncAddLeave,
+  syncUpdateLeave,
+  syncDeleteLeave,
+  syncUpdateStatus,
+  loadMessagesFromSheets,
+  saveMessageToSheets
+};
+
+</script>
+<script>
 let currentEmployee = null;
 let dataSource = null;
 
 let MESSAGES_STORE = []; // تُحمَّل من Google Sheets عند تسجيل الدخول
 
 async function loadMessagesFromSheets() {
-  try {
-    const rows = await fetchSheetData('Messages');
-    MESSAGES_STORE = rows.map(r => ({
-      MessageID:  r.MessageID  || 'MSG' + Math.random().toString(36).slice(2,8),
-      ToUserID:   (r.ToUserID  || 'ALL').toUpperCase(),
-      FromUserID: r.FromUserID || 'ADMIN',
-      Date:       r.Date       || '',
-      Subject:    r.Subject    || '',
-      Body:       r.Body       || '',
-      Read:       parseInt(r.Read || 0)
-    }));
-  } catch(e) {
-    // إذا فشل التحميل، ابدأ بقائمة فارغة
-    MESSAGES_STORE = [];
-  }
+  // handled by Firebase module
 }
 
 const DEMO_DATA = {
@@ -1426,10 +1440,10 @@ async function handleLogin() {
     let employee = null;
     if (dataSource === 'demo') {
       employee = DEMO_DATA.employees.find(e => e.UserID.toUpperCase() === userId && e.Password === password);
-    } else if (CONFIG.sheetId) {
+    } else {
       dataSource = 'sheets';
       try {
-        employee = await fetchEmployeeFromSheets(userId, password);
+        employee = await window._fb.fetchEmployeeFromSheets(userId, password);
       } catch(e) {
         dataSource = 'demo';
         showLoading(false);
@@ -1443,9 +1457,6 @@ async function handleLogin() {
           • أو جرّب <a href="#" onclick="loadDemoData();return false;" style="color:#92400e;font-weight:700;">البيانات التجريبية</a>`;
         return;
       }
-    } else {
-      employee = DEMO_DATA.employees.find(e => e.UserID.toUpperCase() === userId && e.Password === password);
-      if (employee) dataSource = 'demo';
     }
     if (!employee) { showLoading(false); errDiv.style.cssText = ''; errDiv.textContent = 'رمز الدخول أو كلمة العبور غير صحيحة'; errDiv.style.display = 'block'; return; }
     currentEmployee = employee;
@@ -1457,107 +1468,6 @@ async function handleLogin() {
       await checkEmployeeMessages(employee.UserID);
     }
   } catch (err) { showLoading(false); errDiv.style.cssText = ''; errDiv.textContent = 'خطأ في الاتصال: ' + err.message; errDiv.style.display = 'block'; }
-}
-
-// GIDs الحقيقية تُحدَّد من واجهة الإعدادات أو تلقائياً
-const SHEET_GIDS = {
-  'Employees':          localStorage.getItem('gid_Employees')          || '645917957',
-  'AnnualLeaves':       localStorage.getItem('gid_AnnualLeaves')       || '1376477356',
-  'ExceptionalLeaves':  localStorage.getItem('gid_ExceptionalLeaves')  || '1273983452',
-  'SickLeaves':         localStorage.getItem('gid_SickLeaves')         || '543405937',
-  'Messages':           localStorage.getItem('gid_Messages')           || '445899271'
-};
-
-// ===== القراءة عبر CSV المنشور (الطريقة الأكثر موثوقية) =====
-// ===== CORS-safe fetch helper =====
-async function safeFetch(url) {
-  // محاولة مباشرة أولاً
-  try {
-    const res = await fetch(url, { redirect: 'follow', mode: 'cors' });
-    if (res.ok) return res;
-  } catch (e) { /* CORS blocked, try proxy */ }
-  // استخدام CORS proxy كبديل
-  const proxies = [
-    'https://corsproxy.io/?' + encodeURIComponent(url),
-    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
-  ];
-  for (const proxy of proxies) {
-    try {
-      const res = await fetch(proxy, { redirect: 'follow' });
-      if (res.ok) return res;
-    } catch (e) { continue; }
-  }
-  throw new Error('تعذّر الاتصال بالجدول. تأكد أن الجدول منشور للعموم عبر: File → Share → Publish to web');
-}
-
-async function fetchSheetData(sheetName) {
-  // الطريقة الأولى: Apps Script GET
-  try {
-    const url = `${APPS_SCRIPT_URL}?action=getSheet&sheetName=${encodeURIComponent(sheetName)}`;
-    const res = await safeFetch(url);
-    if (res.ok) {
-      const text = await res.text();
-      let data;
-      try { data = JSON.parse(text); } catch { data = null; }
-      if (data && data.success && Array.isArray(data.rows) && data.rows.length > 0) {
-        return data.rows;
-      }
-    }
-  } catch(e) { /* نُكمل للطريقة الثانية */ }
-
-  // الطريقة الثانية: /pub?output=csv (للجداول المنشورة عبر Publish to web)
-  const gid = SHEET_GIDS[sheetName] || '0';
-  const publishedId = CONFIG.publishedId || PUBLISHED_SHEET_ID;
-  const pubCsvUrl = `https://docs.google.com/spreadsheets/d/e/${publishedId}/pub?output=csv&gid=${gid}`;
-  try {
-    const res = await safeFetch(pubCsvUrl);
-    if (res.ok) {
-      const text = await res.text();
-      if (text && !text.trim().startsWith('<!')) {
-        const rows = parseCSV(text);
-        if (rows.length > 0) return rows;
-      }
-    }
-  } catch(e2) { /* try next */ }
-
-  // الطريقة الثالثة: /export?format=csv (للجداول المشاركة بصلاحية عرض)
-  const csvUrl = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/export?format=csv&gid=${gid}&cachebust=${Date.now()}`;
-  try {
-    const res = await safeFetch(csvUrl);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    if (!text || text.trim().startsWith('<!')) throw new Error('الجدول غير منشور للعموم — File → Share → Publish to web');
-    const rows = parseCSV(text);
-    if (rows.length > 0) return rows;
-    throw new Error('لا توجد بيانات في الجدول');
-  } catch(e) {
-    throw new Error(`تعذّر تحميل "${sheetName}": ${e.message}`);
-  }
-}
-
-function parseCSV(text) {
-  function parseLine(line) {
-    const result = []; let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (c === '"') { inQ = !inQ; } else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; } else { cur += c; }
-    }
-    result.push(cur.trim()); return result;
-  }
-  const lines = text.trim().split('\n');
-  if (lines.length < 2) return [];
-  const headers = parseLine(lines[0]);
-  return lines.slice(1).map(line => { const row = parseLine(line); const obj = {}; headers.forEach((h, i) => obj[h.trim()] = (row[i] || '').trim()); return obj; });
-}
-
-async function fetchEmployeeFromSheets(userId, password) {
-  const employees = await fetchSheetData('Employees');
-  return employees.find(e => (e.UserID || '').toUpperCase() === userId && e.Password === password) || null;
-}
-
-async function fetchLeavesFromSheets(sheetName, userId) {
-  const all = await fetchSheetData(sheetName);
-  return all.filter(r => (r.UserID || '').toUpperCase() === userId.toUpperCase());
 }
 
 function filterLeavesByYear(leaves, year) {
@@ -1577,7 +1487,7 @@ async function renderDashboard() {
     sickLeaves   = DEMO_DATA.sickLeaves.filter(r => r.UserID.toUpperCase() === uid);
   } else {
     [annualLeaves, exceptLeaves, sickLeaves] = await Promise.all([
-      fetchLeavesFromSheets('AnnualLeaves', uid), fetchLeavesFromSheets('ExceptionalLeaves', uid), fetchLeavesFromSheets('SickLeaves', uid),
+      window._fb.fetchLeavesFromSheets('AnnualLeaves', uid), window._fb.fetchLeavesFromSheets('ExceptionalLeaves', uid), window._fb.fetchLeavesFromSheets('SickLeaves', uid),
     ]);
   }
   // فلتر السنة الحالية فقط
@@ -1675,7 +1585,7 @@ async function renderAdminDashboard() {
     adminData.sickLeaves   = [...DEMO_DATA.sickLeaves];
   } else {
     try {
-      const [emps, ann, exc, sick] = await Promise.all([fetchSheetData('Employees'), fetchSheetData('AnnualLeaves'), fetchSheetData('ExceptionalLeaves'), fetchSheetData('SickLeaves')]);
+      const [emps, ann, exc, sick] = await Promise.all([window._fb.fetchAllEmployees(), window._fb.fetchAllLeavesFromSheets('AnnualLeaves'), window._fb.fetchAllLeavesFromSheets('ExceptionalLeaves'), window._fb.fetchAllLeavesFromSheets('SickLeaves')]);
       adminData.employees = emps.filter(e => e.UserID !== 'ADMIN');
       adminData.annualLeaves = ann; adminData.exceptLeaves = exc; adminData.sickLeaves = sick;
     } catch(e) { showLoading(false); alert('خطأ في تحميل البيانات: ' + e.message); return; }
@@ -1803,7 +1713,7 @@ async function addEmployee() {
   if (!uid || !name) { alert('رمز الموظف والاسم مطلوبان'); return; }
   const emp = { UserID: uid, Password: pwd, Name: name, Department: dept, Grade: grade };
   showLoading(true);
-  const ok = await syncAddEmployee(emp);
+  const ok = await window._fb.syncAddEmployee(emp);
   showLoading(false);
   if (!ok && dataSource === 'sheets') { return; }
   adminData.employees.push(emp);
@@ -1834,7 +1744,7 @@ async function addLeave(type) {
   }
   if (!row.UserID) { alert('رمز الموظف مطلوب'); return; }
   showLoading(true);
-  await syncAddLeave(sheetName, row);
+  await window._fb.syncAddLeave(sheetName, row);
   showLoading(false);
   arr.push(row); renderAdminTables(); showToast('✅ تم إضافة الإجازة بنجاح');
 }
@@ -1855,7 +1765,7 @@ async function updateStatus(type, idx, newStatus) {
     sheetName = 'SickLeaves';
     r = { ...adminData.sickLeaves[idx] };
   }
-  await syncUpdateStatus(sheetName, r, newStatus);
+  await window._fb.syncUpdateStatus(sheetName, r, newStatus);
   renderAdminTables(); showToast('✅ تم تحديث الحالة');
 }
 
@@ -1987,7 +1897,7 @@ async function saveEditEmployee() {
   adminData.employees[idx].Grade = fi('meGrade').value.trim();
   if (dataSource === 'demo') { const dIdx = DEMO_DATA.employees.findIndex(e => e.UserID === adminData.employees[idx].UserID); if (dIdx > -1) Object.assign(DEMO_DATA.employees[dIdx], adminData.employees[idx]); }
   showLoading(true);
-  await syncUpdateEmployee(adminData.employees[idx]);
+  await window._fb.syncUpdateEmployee(adminData.employees[idx]);
   showLoading(false);
   renderAdminTables(); closeModal(); showToast('✅ تم تعديل بيانات الموظف');
 }
@@ -1996,7 +1906,7 @@ async function deleteEmployee(idx) {
   const e = adminData.employees[idx];
   if (!confirm(`هل تريد حذف الموظف "${e.Name}" (${e.UserID}) نهائياً؟`)) return;
   showLoading(true);
-  await syncDeleteEmployee(e.UserID);
+  await window._fb.syncDeleteEmployee(e.UserID);
   showLoading(false);
   adminData.employees.splice(idx, 1);
   if (dataSource === 'demo') { const dIdx = DEMO_DATA.employees.findIndex(x => x.UserID === e.UserID); if (dIdx > -1) DEMO_DATA.employees.splice(dIdx, 1); }
@@ -2045,7 +1955,7 @@ async function saveEditLeave() {
   const rowForSync = { ...arr[idx], UserID: originalUserID, StartDate: originalStartDate };
   const updatedRow = { ...arr[idx] };
   showLoading(true);
-  await syncUpdateLeave(sheetName, rowForSync, updatedRow);
+  await window._fb.syncUpdateLeave(sheetName, rowForSync, updatedRow);
   showLoading(false);
   renderAdminTables(); closeModal(); showToast('✅ تم تعديل الإجازة بنجاح');
 }
@@ -2058,7 +1968,7 @@ async function deleteLeave(type, idx) {
   const r = arr[idx];
   if (!confirm(`هل تريد حذف ${label} للموظف ${r.UserID}؟`)) return;
   showLoading(true);
-  await syncDeleteLeave(sheetName, r);
+  await window._fb.syncDeleteLeave(sheetName, r);
   showLoading(false);
   arr.splice(idx, 1);
   if (dataSource === 'demo') {
@@ -2087,7 +1997,7 @@ async function initMessagesTab() {
   setRecipient('all');
   if (dataSource === 'sheets') {
     showLoading(true);
-    await loadMessagesFromSheets();
+    await window._fb.loadMessagesFromSheets();
     showLoading(false);
   }
   renderSentMessages();
@@ -2117,7 +2027,7 @@ function renderSentMessages() {
 }
 
 async function checkEmployeeMessages(userID) {
-  if (dataSource === 'sheets') await loadMessagesFromSheets();
+  if (dataSource === 'sheets') await window._fb.loadMessagesFromSheets();
   const msgs = MESSAGES_STORE.filter(m => (m.ToUserID === 'ALL' || m.ToUserID === userID) && m.Read == 0);
   if (msgs.length) showNotifications(msgs, userID);
 }
