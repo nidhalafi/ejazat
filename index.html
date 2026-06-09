@@ -672,8 +672,11 @@
       </button>
       <hr class="sidebar-divider">
       <div class="sidebar-nav-title">معلومات الحساب</div>
-      <button class="sidebar-nav-item" onclick="closeSidebar()">
+      <button class="sidebar-nav-item" id="sidebarProfileBtn" onclick="sidebarSwitchTab('profile', this)">
         <span class="nav-icon">👤</span> ملف الموظف
+      </button>
+      <button class="sidebar-nav-item" id="sidebarMsgBtn" onclick="sidebarSwitchTab('messages', this)">
+        <span class="nav-icon">✉️</span> الرسائل <span id="sidebarMsgBadge" style="display:none;background:#dc2626;color:#fff;border-radius:50%;font-size:10px;padding:1px 6px;margin-right:4px;"></span>
       </button>
     </nav>
 
@@ -740,6 +743,8 @@
       <button class="tab-btn active" onclick="switchTab('annual', this)">📅 الإجازات السنوية</button>
       <button class="tab-btn" onclick="switchTab('exceptional', this)">⭐ الإجازات الاستثنائية</button>
       <button class="tab-btn" onclick="switchTab('sick', this)">🏥 الإجازات المرضية</button>
+      <button class="tab-btn" id="msgTabBtn" onclick="switchTab('messages', this)">✉️ الرسائل <span id="msgBadge" style="display:none;background:#dc2626;color:#fff;border-radius:50%;font-size:10px;padding:1px 5px;margin-right:3px;"></span></button>
+      <button class="tab-btn" id="profileTabBtn" onclick="switchTab('profile', this)" style="display:none;">👤 ملف الموظف</button>
     </div>
     <!-- Archive year tabs injected dynamically -->
     <div id="archiveTabsContainer"></div>
@@ -764,8 +769,29 @@
         <div class="leave-table-wrap"><table class="leave-table"><thead><tr><th>#</th><th>تاريخ البداية</th><th>تاريخ النهاية</th><th>عدد الأيام</th><th>التشخيص / الملاحظة</th></tr></thead><tbody id="sickTableBody"></tbody></table></div>
       </div>
     </div>
+    <!-- Profile Panel -->
+    <div class="tab-panel" id="tab-profile">
+      <div class="section-card" style="overflow:hidden;">
+        <div class="section-header">
+          <div><h3>👤 ملف الموظف</h3><p>معلوماتك الشخصية وإعدادات الحساب</p></div>
+        </div>
+        <div style="padding:20px;" id="profileContent"></div>
+      </div>
+    </div>
+
     <!-- Archive panels injected dynamically -->
     <div id="archivePanelsContainer"></div>
+
+    <!-- Messages Panel -->
+    <div class="tab-panel" id="tab-messages">
+      <div class="section-card">
+        <div class="section-header">
+          <div><h3>✉️ رسائلي</h3><p>الرسائل الواردة من الإدارة</p></div>
+          <span id="unreadCountLabel" style="background:#fee2e2;color:#dc2626;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;"></span>
+        </div>
+        <div id="empMessagesList" style="padding:8px 0;"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2092,8 +2118,77 @@ function deleteAdminMessage(docId, messageId) {
 
 async function checkEmployeeMessages(userID) {
   if (dataSource === 'sheets') await window._fb.loadMessagesFromSheets();
-  const msgs = MESSAGES_STORE.filter(m => (m.ToUserID === 'ALL' || m.ToUserID === userID) && m.Read == 0);
-  if (msgs.length) showNotifications(msgs, userID);
+  const allMsgs = MESSAGES_STORE.filter(m => m.ToUserID === 'ALL' || m.ToUserID === userID.toUpperCase());
+  const unread = allMsgs.filter(m => m.Read == 0);
+  // Update badge
+  updateMsgBadge(unread.length);
+  // Render inbox
+  renderEmpMessages(userID);
+  // Show popup for unread
+  if (unread.length) showNotifications(unread, userID);
+}
+
+function updateMsgBadge(count) {
+  const badge = document.getElementById('msgBadge');
+  const sbBadge = document.getElementById('sidebarMsgBadge');
+  if (badge) { badge.textContent = count; badge.style.display = count > 0 ? 'inline' : 'none'; }
+  if (sbBadge) { sbBadge.textContent = count; sbBadge.style.display = count > 0 ? 'inline' : 'none'; }
+  const lbl = document.getElementById('unreadCountLabel');
+  if (lbl) { lbl.textContent = count > 0 ? count + ' غير مقروءة' : ''; lbl.style.display = count > 0 ? 'inline' : 'none'; }
+}
+
+function renderEmpMessages(userID) {
+  const el = document.getElementById('empMessagesList');
+  if (!el) return;
+  const uid = (userID || '').toUpperCase();
+  const msgs = [...MESSAGES_STORE]
+    .filter(m => m.ToUserID === 'ALL' || m.ToUserID === uid)
+    .sort((a, b) => (b.Date || '').localeCompare(a.Date || ''));
+
+  if (!msgs.length) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">✉️</div><p>لا توجد رسائل</p></div>';
+    return;
+  }
+  el.innerHTML = msgs.map(m => {
+    const isUnread = m.Read == 0;
+    return `<div style="border:1px solid ${isUnread ? '#bfdbfe' : '#e2e8f0'};border-radius:12px;padding:16px;margin:8px 16px;background:${isUnread ? '#eff6ff' : '#fff'};position:relative;">
+      ${isUnread ? '<span style="position:absolute;top:12px;left:12px;width:8px;height:8px;background:#2563eb;border-radius:50%;"></span>' : ''}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px;flex-wrap:wrap;">
+        <div style="font-weight:700;font-size:14px;color:#0f172a;">${m.Subject}</div>
+        <span style="font-size:11px;color:#94a3b8;white-space:nowrap;">${m.Date || ''}</span>
+      </div>
+      <div style="font-size:13px;color:#475569;line-height:1.8;margin-bottom:12px;">${m.Body}</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        ${isUnread ? `<button onclick="empMarkRead('${m._docId || ''}', '${m.MessageID}', '${uid}')" style="padding:7px 14px;border:1px solid #3b82f6;border-radius:8px;background:#eff6ff;color:#2563eb;cursor:pointer;font-size:12px;font-family:var(--font);font-weight:600;">✓ تم الاطلاع</button>` : '<span style="font-size:11px;color:#94a3b8;padding:7px 0;">✓ تمت القراءة</span>'}
+        <button onclick="empDeleteMsg('${m._docId || ''}', '${m.MessageID}', '${uid}')" style="padding:7px 14px;border:1px solid #fca5a5;border-radius:8px;background:#fee2e2;color:#dc2626;cursor:pointer;font-size:12px;font-family:var(--font);font-weight:600;">🗑️ حذف</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function empMarkRead(docId, messageId, userID) {
+  const m = MESSAGES_STORE.find(m => (docId && m._docId === docId) || m.MessageID === messageId);
+  if (m) {
+    m.Read = 1;
+    if (dataSource === 'sheets' && m._docId) window._fb.markMessageRead(m._docId);
+  }
+  const unread = MESSAGES_STORE.filter(msg => (msg.ToUserID === 'ALL' || msg.ToUserID === userID) && msg.Read == 0).length;
+  updateMsgBadge(unread);
+  renderEmpMessages(userID);
+}
+
+function empDeleteMsg(docId, messageId, userID) {
+  if (!confirm('هل تريد حذف هذه الرسالة؟')) return;
+  const idx = MESSAGES_STORE.findIndex(m => (docId && m._docId === docId) || m.MessageID === messageId);
+  if (idx > -1) {
+    const m = MESSAGES_STORE[idx];
+    if (dataSource === 'sheets' && m._docId) window._fb.deleteMessageFromSheets(m._docId);
+    MESSAGES_STORE.splice(idx, 1);
+  }
+  const unread = MESSAGES_STORE.filter(msg => (msg.ToUserID === 'ALL' || msg.ToUserID === userID) && msg.Read == 0).length;
+  updateMsgBadge(unread);
+  renderEmpMessages(userID);
+  showToast('🗑️ تم حذف الرسالة');
 }
 
 function showNotifications(msgs, userID) {
@@ -2121,6 +2216,10 @@ function showNotifications(msgs, userID) {
       m.Read = 1;
       if (dataSource === 'sheets' && m._docId) window._fb.markMessageRead(m._docId);
       overlay.remove(); currentIdx++; showOne();
+      // Refresh inbox if open
+      const unread = MESSAGES_STORE.filter(msg => (msg.ToUserID === 'ALL' || msg.ToUserID === userID) && msg.Read == 0).length;
+      updateMsgBadge(unread);
+      if (document.getElementById('empMessagesList')) renderEmpMessages(userID);
     }
     // Delete: remove from store + Firebase
     function deleteMsg() {
@@ -2128,6 +2227,9 @@ function showNotifications(msgs, userID) {
       if (idx > -1) MESSAGES_STORE.splice(idx, 1);
       if (dataSource === 'sheets' && m._docId) window._fb.deleteMessageFromSheets(m._docId);
       overlay.remove(); currentIdx++; showOne();
+      const unread = MESSAGES_STORE.filter(msg => (msg.ToUserID === 'ALL' || msg.ToUserID === userID) && msg.Read == 0).length;
+      updateMsgBadge(unread);
+      if (document.getElementById('empMessagesList')) renderEmpMessages(userID);
     }
 
     overlay.querySelector('#markReadBtn').addEventListener('click', markRead);
@@ -2266,9 +2368,131 @@ function closeSidebar() {
   document.body.style.overflow = '';
 }
 
+function renderProfileContent() {
+  const emp = currentEmployee;
+  if (!emp) return;
+  const el = document.getElementById('profileContent');
+  if (!el) return;
+  el.innerHTML = `
+    <!-- Avatar + name -->
+    <div style="display:flex;align-items:center;gap:16px;padding:16px 0 20px;border-bottom:1px solid var(--border);margin-bottom:20px;">
+      <div style="width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#1a3a5c,#0ea5e9);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;flex-shrink:0;">
+        ${emp.Name.split(' ').slice(0,2).map(w=>w[0]).join('')}
+      </div>
+      <div>
+        <div style="font-size:18px;font-weight:800;color:var(--text-dark);">${emp.Name}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">رمز الموظف: <strong style="color:#2563eb;">${emp.UserID}</strong></div>
+      </div>
+    </div>
+
+    <!-- Info rows (read-only) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+      <div style="background:#f8fafc;border-radius:10px;padding:12px;">
+        <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:4px;">رمز الموظف</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text-dark);">${emp.UserID}</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:10px;padding:12px;">
+        <div style="font-size:11px;color:var(--text-muted);font-weight:700;margin-bottom:4px;">الصفة / الدور</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text-dark);">${emp.Role === 'admin' ? '🛡️ مدير' : '👤 موظف'}</div>
+      </div>
+    </div>
+
+    <!-- Editable fields -->
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:16px;margin-bottom:20px;">
+      <div style="font-size:13px;font-weight:700;color:#1d4ed8;margin-bottom:14px;">✏️ المعلومات القابلة للتعديل</div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:5px;">القسم / الوحدة</label>
+        <input id="profileDept" type="text" value="${emp.Department || ''}"
+          style="width:100%;padding:10px 12px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:var(--font);font-size:14px;color:var(--text-dark);background:#fff;outline:none;">
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:12px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:5px;">الرتبة / الدرجة</label>
+        <input id="profileGrade" type="text" value="${emp.Grade || ''}"
+          style="width:100%;padding:10px 12px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:var(--font);font-size:14px;color:var(--text-dark);background:#fff;outline:none;">
+      </div>
+
+      <div style="margin-bottom:4px;">
+        <label style="font-size:12px;font-weight:700;color:var(--text-muted);display:block;margin-bottom:5px;">كلمة المرور الجديدة</label>
+        <div style="display:flex;gap:8px;">
+          <input id="profilePwd" type="password" placeholder="اتركها فارغة إن لم تريد التغيير"
+            style="flex:1;padding:10px 12px;border:1.5px solid #bfdbfe;border-radius:8px;font-family:var(--font);font-size:14px;color:var(--text-dark);background:#fff;outline:none;direction:ltr;">
+          <button onclick="document.getElementById('profilePwd').type = document.getElementById('profilePwd').type==='password'?'text':'password'"
+            style="padding:10px 12px;border:1px solid #bfdbfe;border-radius:8px;background:#fff;cursor:pointer;font-size:14px;">👁</button>
+        </div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:4px;">اتركها فارغة للإبقاء على كلمة المرور الحالية</div>
+      </div>
+    </div>
+
+    <div id="profileMsg" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;text-align:center;"></div>
+
+    <button onclick="saveProfileChanges()"
+      style="width:100%;padding:13px;background:linear-gradient(135deg,#1a3a5c,#0ea5e9);color:#fff;border:none;border-radius:10px;font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;">
+      💾 حفظ التعديلات
+    </button>`;
+}
+
+async function saveProfileChanges() {
+  const emp = currentEmployee;
+  if (!emp) return;
+  const dept  = document.getElementById('profileDept').value.trim();
+  const grade = document.getElementById('profileGrade').value.trim();
+  const pwd   = document.getElementById('profilePwd').value.trim();
+  const msgEl = document.getElementById('profileMsg');
+
+  if (!dept || !grade) {
+    msgEl.style.cssText = 'display:block;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;text-align:center;';
+    msgEl.textContent = '⚠️ القسم والرتبة لا يمكن أن يكونا فارغَين';
+    return;
+  }
+
+  emp.Department = dept;
+  emp.Grade = grade;
+  if (pwd) emp.Password = pwd;
+
+  if (dataSource === 'sheets') {
+    try {
+      await window._fb.syncUpdateEmployee(emp);
+    } catch(e) {
+      msgEl.style.cssText = 'display:block;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;text-align:center;';
+      msgEl.textContent = '❌ خطأ في الحفظ: ' + e.message;
+      return;
+    }
+  }
+
+  // Update in adminData too if loaded
+  if (window.adminData) {
+    const idx = adminData.employees.findIndex(e => e.UserID === emp.UserID);
+    if (idx > -1) adminData.employees[idx] = { ...adminData.employees[idx], ...emp };
+  }
+
+  // Clear password field
+  document.getElementById('profilePwd').value = '';
+
+  msgEl.style.cssText = 'display:block;background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;text-align:center;';
+  msgEl.textContent = '✅ تم حفظ التعديلات بنجاح';
+  setTimeout(() => { msgEl.style.display = 'none'; }, 3000);
+
+  // Refresh header details if on dashboard
+  const detailsEl = document.getElementById('dashDetails');
+  if (detailsEl) detailsEl.textContent = `${emp.Department} — الرتبة: ${emp.Grade} — رمز الموظف: ${emp.UserID}`;
+}
+
 function sidebarSwitchTab(tabName, btn) {
   document.querySelectorAll('.sidebar-nav-item').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  if (tabName === 'profile') {
+    switchTab('profile', document.getElementById('profileTabBtn'));
+    renderProfileContent();
+    closeSidebar();
+    return;
+  }
+  if (tabName === 'messages') {
+    switchTab('messages', document.getElementById('msgTabBtn'));
+    closeSidebar();
+    return;
+  }
   const tabMap = { 'annual': 0, 'exceptional': 1, 'sick': 2 };
   const tabBtns = document.querySelectorAll('.tab-btn');
   if (tabBtns[tabMap[tabName]]) tabBtns[tabMap[tabName]].click();
